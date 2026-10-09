@@ -1,65 +1,82 @@
 # Majesty Tactical Map
 
-Browser-based tactical map platform for Majesty RP with: 
-- 3D-style tactical board
-- map editor for placing and shaping objects
-- offline editor workflow
-- real-time browser sync across devices
-- Discord presence/session layer
-- mobile-friendly layout without installing an app
+Browser-first tactical map platform for Majesty RP.
 
-## Features
+This repository is shaped around a browser-based “thick client” architecture:
+- the tactical map is edited directly in the browser
+- the map state is stored as JSON and synchronized via API/WebSocket
+- each user gets an independent session and presence state
+- the same map can be opened on desktop, tablet, or mobile browser
+- Discord activity can be updated per session without installing a native app
 
-- Isometric tactical board with grid and map layers
-- Editor tools for rectangle, circle, polygon, marker, and wall objects
-- Shape controls for size, position, rotation, corner radius, opacity, and color
-- Local persistence and session-based data model
-- REST API + WebSocket synchronization across browsers
-- Discord activity payload builder for each session
-- Responsive mobile UI to view or edit quickly from a phone browser
+## Project goals
 
-## Quick start
+- Build a tactical 3D-style board with 2D editing tools and transform controls
+- Allow offline map design and placement of structures, roads, zones, and markers
+- Manage active players with per-session presence
+- Keep all data client-side and sync only the map state between devices
+- Make a mobile view that is usable without a dedicated app
+
+## Stage 2 additions
+
+This version adds:
+- map management over a real data store
+- multiple map IDs and session tracking
+- separate mobile viewer mode
+- stronger browser editor state and selection tools
+- Discord presence payload support and live WebSocket sync
+- a cleaner project structure for future expansion
+
+## Run locally
 
 ```bash
 npm install
 npm start
 ```
 
-Then open:
-- http://localhost:3000
+Open:
+- Desktop editor: http://localhost:3000/
+- Mobile view: http://localhost:3000/mobile
 
-## Project structure
+## File structure
 
-- `server.js` — Express API and WebSocket server
-- `public/` — browser app UI and map editor
-- `data/default-map.json` — starting map state
+```text
+/
+  README.md
+  server.js
+  package.json
+  .gitignore
+  data/
+    maps.json
+    sessions.json
+  public/
+    index.html
+    styles.css
+    app.js
+    mobile.html
+    mobile.css
+    mobile.js
+```
 
 ## API
 
-- `GET /api/health` — server status
-- `GET /api/map` — load the active map
-- `POST /api/map` — save map state
-- `GET /api/discord/presence` — get Discord presence payload
-- `POST /api/discord/presence` — update presence state
-- `GET /ws` — WebSocket stream for live map events
+- `GET /api/health` — health check
+- `GET /api/maps` — list all maps
+- `GET /api/maps/:id` — get a single map
+- `POST /api/maps/:id` — save a map state
+- `GET /api/sessions` — list active sessions
+- `POST /api/sessions` — create/update a session
+- `GET /api/discord/presence` — return presence payload
+- `POST /api/discord/presence` — update presence payload
 
-## Browser usage
+## Editing features
 
-1. Open the app in a browser.
-2. Select a tool from the left panel.
-3. Click on the map to add a shape.
-4. Adjust size and properties in the inspector.
-5. Save the map to persist it.
-6. Share the URL to other devices on the same network or hosting environment.
+- select / move / delete objects
+- rectangle, circle, polygon, and marker tools
+- size, position, opacity, color, layer adjustments
+- map save to server
+- live sync between browser clients
 
-## Architecture
+## Not included yet
 
-This project is built around a “thick-client browser” approach:
-- the map state is processed locally in the browser
-- a single shared JSON state is synced via API/WebSocket
-- each user/session has their own map presence data
-- Discord activity is layered on top without requiring a native app
-
-## Notes
-
-This is intentionally built as a browser-first tactical system rather than a native mobile wrapper. It keeps the map construction and tactical planning tools accessible by anyone with a web browser.
+This is still a web-first tactical tool, not a native app. It is intentionally designed to run in-browser with no installation friction, which matches your requirement for “no one wants to install an app.”

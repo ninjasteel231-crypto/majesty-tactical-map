@@ -3,14 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Majesty Tactical Map</title>
+    <title>Majesty Tactical Map Editor</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar left-panel">
         <div class="panel-header">
-          <h1>Majesty Map</h1>
+          <h1>Majesty</h1>
+          <small>Tactical map editor</small>
         </div>
 
         <div class="tool-group">
@@ -27,34 +28,37 @@
           <h2>Map</h2>
           <button id="addObjectBtn">Add object</button>
           <button id="saveMapBtn">Save map</button>
-          <button id="newMapBtn">Reset map</button>
+          <button id="resetMapBtn">Reset map</button>
+          <button id="mobileViewBtn">Open mobile view</button>
         </div>
 
         <div class="tool-group">
           <h2>Session</h2>
           <label>
-            <span>User</span>
-            <input id="userNameInput" type="text" value="Operator" />
+            <span>Player name</span>
+            <input id="playerNameInput" type="text" value="Operator" />
           </label>
           <label>
-            <span>Session</span>
-            <input id="sessionIdInput" type="text" value="operator-1" />
+            <span>Session ID</span>
+            <input id="sessionIdInput" type="text" value="session-operator-1" />
           </label>
-          <button id="connectSessionBtn">Connect</button>
+          <button id="connectSessionBtn">Connect session</button>
           <button id="presenceBtn">Update Discord</button>
         </div>
       </aside>
 
       <main class="main-panel">
         <div class="topbar">
-          <div>
+          <div class="map-meta">
             <strong id="mapTitle">Fortazan Kudo</strong>
             <span id="statusText">Ready</span>
           </div>
           <div class="badge" id="syncBadge">offline</div>
         </div>
 
-        <canvas id="mapCanvas" width="1200" height="800"></canvas>
+        <div class="map-area">
+          <canvas id="mapCanvas" width="1400" height="900"></canvas>
+        </div>
       </main>
 
       <aside class="sidebar right-panel">
@@ -65,7 +69,7 @@
         <div class="inspector-block">
           <label>
             <span>Object name</span>
-            <input id="objectNameInput" type="text" value="Object" />
+            <input id="objectNameInput" type="text" />
           </label>
           <label>
             <span>Layer</span>

@@ -1,0 +1,78 @@
+{
+  "maps": {
+    "fortazan-kudo": {
+      "id": "fortazan-kudo",
+      "name": "Fortazan Kudo",
+      "description": "Main tactical map for the operation",
+      "width": 1600,
+      "height": 1000,
+      "gridSize": 40,
+      "layers": [
+        { "id": "terrain", "name": "Terrain", "visible": true },
+        { "id": "structures", "name": "Structures", "visible": true },
+        { "id": "tactics", "name": "Tactical markers", "visible": true }
+      ],
+      "objects": [
+        {
+          "id": "road-1",
+          "name": "Main road",
+          "type": "rectangle",
+          "layer": "terrain",
+          "x": 120,
+          "y": 160,
+          "width": 620,
+          "height": 120,
+          "rotation": 0,
+          "cornerRadius": 28,
+          "fill": "#334155",
+          "stroke": "#cbd5e1",
+          "strokeWidth": 2,
+          "opacity": 0.8,
+          "z": 5
+        },
+        {
+          "id": "building-1",
+          "name": "Building",
+          "type": "rectangle",
+          "layer": "structures",
+          "x": 440,
+          "y": 450,
+          "width": 260,
+          "height": 180,
+          "rotation": 0,
+          "cornerRadius": 18,
+          "fill": "#475569",
+          "stroke": "#e2e8f0",
+          "strokeWidth": 2,
+          "opacity": 0.9,
+          "z": 10
+        },
+        {
+          "id": "enemy-1",
+          "name": "Enemy marker",
+          "type": "marker",
+          "layer": "tactics",
+          "x": 780,
+          "y": 500,
+          "width": 70,
+          "height": 70,
+          "rotation": 0,
+          "fill": "#ef4444",
+          "stroke": "#fecaca",
+          "strokeWidth": 2,
+          "opacity": 1,
+          "z": 20,
+          "label": "E-1"
+        }
+      ],
+      "players": [
+        { "id": "player-alpha", "name": "Alpha", "x": 320, "y": 280, "color": "#34d399", "active": true },
+        { "id": "player-beta", "name": "Bravo", "x": 560, "y": 310, "color": "#60a5fa", "active": true }
+      ],
+      "markers": [
+        { "id": "mark-1", "label": "Checkpoint", "x": 650, "y": 260, "color": "#fbbf24" }
+      ],
+      "updatedAt": "2026-10-09T05:43:35.000Z"
+    }
+  }
+}

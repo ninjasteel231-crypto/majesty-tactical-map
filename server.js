@@ -11,119 +11,141 @@ const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
-const MAP_FILE = path.join(DATA_DIR, 'map-state.json');
+const MAPS_FILE = path.join(DATA_DIR, 'maps.json');
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const defaultMap = {
-  id: 'fortazan-kudo',
-  name: 'Fortazan Kudo',
-  description: 'Tactical map prototype',
-  width: 1200,
-  height: 900,
-  gridSize: 40,
-  layers: [
-    { id: 'terrain', name: 'Terrain', visible: true },
-    { id: 'structures', name: 'Structures', visible: true },
-    { id: 'tactics', name: 'Tactical markers', visible: true }
-  ],
-  objects: [
-    {
-      id: 'wall-1',
-      name: 'Outer wall',
-      type: 'rectangle',
-      layer: 'structures',
-      x: 180,
-      y: 170,
-      width: 480,
-      height: 120,
-      rotation: 0,
-      cornerRadius: 18,
-      fill: '#2d3748',
-      stroke: '#dbeafe',
-      strokeWidth: 2,
-      opacity: 0.9,
-      z: 10,
-      locked: false
-    },
-    {
-      id: 'marker-1',
-      name: 'Enemy marker',
-      type: 'marker',
-      layer: 'tactics',
-      x: 560,
-      y: 420,
-      width: 80,
-      height: 80,
-      rotation: 0,
-      fill: '#ef4444',
-      stroke: '#fecaca',
-      opacity: 0.95,
-      z: 20,
-      label: 'E-1'
-    },
-    {
-      id: 'circle-1',
-      name: 'Zone',
-      type: 'circle',
-      layer: 'tactics',
-      x: 760,
-      y: 420,
-      radius: 80,
-      fill: '#60a5fa',
-      stroke: '#dbeafe',
-      opacity: 0.38,
-      z: 18
-    }
-  ],
-  players: [
-    {
-      id: 'session-player-1',
-      name: 'Operator',
-      x: 350,
-      y: 260,
-      color: '#22c55e',
-      active: true,
-      status: 'on-map'
-    }
-  ],
-  markers: [
-    { id: 'marker-a', label: 'Alert', x: 680, y: 300, color: '#f59e0b' }
-  ],
-  updatedAt: new Date().toISOString()
-};
+function defaultMap() {
+  return {
+    id: 'fortazan-kudo',
+    name: 'Fortazan Kudo',
+    description: 'Main tactical map for the operation',
+    width: 1600,
+    height: 1000,
+    gridSize: 40,
+    layers: [
+      { id: 'terrain', name: 'Terrain', visible: true },
+      { id: 'structures', name: 'Structures', visible: true },
+      { id: 'tactics', name: 'Tactical markers', visible: true }
+    ],
+    objects: [
+      {
+        id: 'road-1',
+        name: 'Main road',
+        type: 'rectangle',
+        layer: 'terrain',
+        x: 120,
+        y: 160,
+        width: 620,
+        height: 120,
+        rotation: 0,
+        cornerRadius: 28,
+        fill: '#334155',
+        stroke: '#cbd5e1',
+        strokeWidth: 2,
+        opacity: 0.8,
+        z: 5
+      },
+      {
+        id: 'building-1',
+        name: 'Building',
+        type: 'rectangle',
+        layer: 'structures',
+        x: 440,
+        y: 450,
+        width: 260,
+        height: 180,
+        rotation: 0,
+        cornerRadius: 18,
+        fill: '#475569',
+        stroke: '#e2e8f0',
+        strokeWidth: 2,
+        opacity: 0.9,
+        z: 10
+      },
+      {
+        id: 'enemy-1',
+        name: 'Enemy marker',
+        type: 'marker',
+        layer: 'tactics',
+        x: 780,
+        y: 500,
+        width: 70,
+        height: 70,
+        rotation: 0,
+        fill: '#ef4444',
+        stroke: '#fecaca',
+        strokeWidth: 2,
+        opacity: 1,
+        z: 20,
+        label: 'E-1'
+      }
+    ],
+    players: [
+      { id: 'player-alpha', name: 'Alpha', x: 320, y: 280, color: '#34d399', active: true },
+      { id: 'player-beta', name: 'Bravo', x: 560, y: 310, color: '#60a5fa', active: true }
+    ],
+    markers: [
+      { id: 'mark-1', label: 'Checkpoint', x: 650, y: 260, color: '#fbbf24' }
+    ],
+    updatedAt: new Date().toISOString()
+  };
+}
 
-function loadMap() {
+function defaultSessions() {
+  return {
+    sessions: [
+      {
+        id: 'session-operator-1',
+        userName: 'Operator',
+        status: 'On map',
+        connectedAt: new Date().toISOString(),
+        lastSeen: new Date().toISOString(),
+        mapId: 'fortazan-kudo'
+      }
+    ]
+  };
+}
+
+function loadJson(filePath, fallback) {
   try {
-    if (!fs.existsSync(MAP_FILE)) {
-      fs.writeFileSync(MAP_FILE, JSON.stringify(defaultMap, null, 2));
-      return structuredClone(defaultMap);
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, JSON.stringify(fallback, null, 2));
+      return JSON.parse(JSON.stringify(fallback));
     }
 
-    const fileContent = fs.readFileSync(MAP_FILE, 'utf8');
-    const parsed = JSON.parse(fileContent);
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
     return parsed;
   } catch (error) {
-    console.error('Failed to load map state:', error);
-    return structuredClone(defaultMap);
+    console.error(`Failed to read ${filePath}:`, error);
+    return JSON.parse(JSON.stringify(fallback));
   }
 }
 
-function saveMap(mapState) {
-  const payload = {
-    ...mapState,
-    updatedAt: new Date().toISOString()
-  };
-
-  fs.writeFileSync(MAP_FILE, JSON.stringify(payload, null, 2));
-  return payload;
+function saveJson(filePath, payload) {
+  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
 }
 
-let mapState = loadMap();
+function ensureMapStore() {
+  const mapStore = loadJson(MAPS_FILE, { maps: { 'fortazan-kudo': defaultMap() } });
+  const data = mapStore && mapStore.maps ? mapStore : { maps: mapStore };
 
-app.use(cors());
-app.use(express.json({ limit: '5mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+  if (!data.maps || !data.maps['fortazan-kudo']) {
+    data.maps = { ...data.maps, 'fortazan-kudo': defaultMap() };
+  }
+
+  saveJson(MAPS_FILE, data);
+  return data;
+}
+
+function getMapStore() {
+  return ensureMapStore();
+}
+
+let mapStore = getMapStore();
+let sessionsStore = loadJson(SESSIONS_FILE, defaultSessions());
 
 function broadcast(message) {
   const payload = JSON.stringify(message);
@@ -134,54 +156,92 @@ function broadcast(message) {
   });
 }
 
+app.use(cors());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, status: 'ready', map: mapState.name, updatedAt: mapState.updatedAt });
+  res.json({ ok: true, status: 'ready', mapCount: Object.keys(mapStore.maps || {}).length });
 });
 
-app.get('/api/map', (req, res) => {
-  mapState = loadMap();
-  res.json(mapState);
+app.get('/api/maps', (req, res) => {
+  const maps = Object.values(mapStore.maps || {}).map((map) => ({
+    id: map.id,
+    name: map.name,
+    description: map.description,
+    updatedAt: map.updatedAt
+  }));
+
+  res.json({ maps });
 });
 
-app.post('/api/map', (req, res) => {
+app.get('/api/maps/:id', (req, res) => {
+  const mapId = req.params.id;
+  const map = (mapStore.maps || {})[mapId];
+
+  if (!map) {
+    return res.status(404).json({ error: 'Map not found.' });
+  }
+
+  res.json(map);
+});
+
+app.post('/api/maps/:id', (req, res) => {
+  const mapId = req.params.id;
   const incoming = req.body;
+
   if (!incoming || !incoming.objects) {
     return res.status(400).json({ error: 'Invalid map payload.' });
   }
 
-  mapState = saveMap(incoming);
-  broadcast({ type: 'map:update', payload: mapState });
-  res.json(mapState);
-});
-
-app.post('/api/session', (req, res) => {
-  const { sessionId, userName, status } = req.body || {};
-  const safeId = sessionId || `session-${Date.now()}`;
-  const player = {
-    id: `player-${safeId}`,
-    name: userName || 'Operator',
-    x: 360,
-    y: 260,
-    color: '#34d399',
-    active: true,
-    status: status || 'on-map'
+  const updated = {
+    ...incoming,
+    id: mapId,
+    updatedAt: new Date().toISOString()
   };
 
-  mapState.players = mapState.players || [];
-  const existingIndex = mapState.players.findIndex((p) => p.id === player.id);
+  mapStore.maps = mapStore.maps || {};
+  mapStore.maps[mapId] = updated;
+  saveJson(MAPS_FILE, mapStore);
 
-  if (existingIndex >= 0) {
-    mapState.players[existingIndex] = { ...mapState.players[existingIndex], ...player };
+  broadcast({ type: 'map:update', payload: updated });
+  res.json(updated);
+});
+
+app.get('/api/sessions', (req, res) => {
+  const list = Array.isArray(sessionsStore.sessions) ? sessionsStore.sessions : [];
+  res.json({ sessions: list });
+});
+
+app.post('/api/sessions', (req, res) => {
+  const payload = req.body || {};
+  const id = payload.id || `session-${Date.now()}`;
+
+  const entry = {
+    id,
+    userName: payload.userName || 'Operator',
+    status: payload.status || 'On map',
+    mapId: payload.mapId || 'fortazan-kudo',
+    connectedAt: payload.connectedAt || new Date().toISOString(),
+    lastSeen: new Date().toISOString()
+  };
+
+  sessionsStore.sessions = Array.isArray(sessionsStore.sessions) ? sessionsStore.sessions : [];
+  const idx = sessionsStore.sessions.findIndex((session) => session.id === id);
+
+  if (idx >= 0) {
+    sessionsStore.sessions[idx] = { ...sessionsStore.sessions[idx], ...entry };
   } else {
-    mapState.players.push(player);
+    sessionsStore.sessions.push(entry);
   }
 
-  mapState = saveMap(mapState);
-  broadcast({ type: 'session:update', payload: { sessionId: safeId, player } });
-  res.json({ sessionId: safeId, player });
+  saveJson(SESSIONS_FILE, sessionsStore);
+  broadcast({ type: 'session:update', payload: entry });
+  res.json(entry);
 });
 
 app.get('/api/discord/presence', (req, res) => {
+  const sessionId = req.query.sessionId || 'session-operator-1';
   const payload = {
     application: 'majesty-tactical-map',
     status: 'In tactical planning',
@@ -191,62 +251,62 @@ app.get('/api/discord/presence', (req, res) => {
     largeText: 'Majesty RP tactical map',
     smallImage: 'discord',
     smallText: 'Session active',
-    timestamps: {
-      start: Date.now() - 1000 * 60 * 12
-    }
+    sessionId
   };
 
   res.json(payload);
 });
 
 app.post('/api/discord/presence', (req, res) => {
-  const incoming = req.body || {};
+  const body = req.body || {};
   const payload = {
     application: 'majesty-tactical-map',
-    status: incoming.status || 'In tactical planning',
-    details: incoming.details || 'Fortazan Kudo',
-    state: incoming.state || 'Tracking enemy positions',
-    largeImage: incoming.largeImage || 'map',
-    largeText: incoming.largeText || 'Majesty RP tactical map',
-    smallImage: incoming.smallImage || 'discord',
-    smallText: incoming.smallText || 'Session active',
-    sessionId: incoming.sessionId || 'global'
+    status: body.status || 'In tactical planning',
+    details: body.details || 'Fortazan Kudo',
+    state: body.state || 'Tracking enemy positions',
+    largeImage: body.largeImage || 'map',
+    largeText: body.largeText || 'Majesty RP tactical map',
+    smallImage: body.smallImage || 'discord',
+    smallText: body.smallText || 'Session active',
+    sessionId: body.sessionId || 'global'
   };
 
   broadcast({ type: 'presence:update', payload });
   res.json(payload);
 });
 
-app.get('/api/session/:id?', (req, res) => {
-  const { id } = req.params;
-  const player = mapState.players.find((p) => p.id === `player-${id}` || p.id === id);
-  res.json({ sessionId: id || 'global', player: player || null, map: mapState.name });
-});
-
-wss.on('connection', (socket) => {
-  socket.send(JSON.stringify({ type: 'ready', payload: { map: mapState, connected: true } }));
-
-  socket.on('message', (raw) => {
-    try {
-      const parsed = JSON.parse(raw.toString());
-      if (parsed.type === 'map:save' && parsed.payload) {
-        mapState = saveMap(parsed.payload);
-        broadcast({ type: 'map:update', payload: mapState });
-      }
-
-      if (parsed.type === 'presence:update' && parsed.payload) {
-        broadcast({ type: 'presence:update', payload: parsed.payload });
-      }
-    } catch (error) {
-      console.error('WS message parse error:', error);
-    }
-  });
+app.get('/mobile', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'mobile.html'));
 });
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+wss.on('connection', (socket) => {
+  socket.send(JSON.stringify({ type: 'ready', payload: { maps: Object.values(mapStore.maps || {}), sessions: sessionsStore.sessions } }));
+
+  socket.on('message', (raw) => {
+    try {
+      const message = JSON.parse(raw.toString());
+
+      if (message.type === 'map:save' && message.payload) {
+        const { id } = message.payload;
+        mapStore.maps = mapStore.maps || {};
+        mapStore.maps[id] = { ...message.payload, updatedAt: new Date().toISOString() };
+        saveJson(MAPS_FILE, mapStore);
+        broadcast({ type: 'map:update', payload: mapStore.maps[id] });
+      }
+
+      if (message.type === 'presence:update' && message.payload) {
+        broadcast({ type: 'presence:update', payload: message.payload });
+      }
+    } catch (error) {
+      console.error('WS parse error:', error);
+    }
+  });
+});
+
 server.listen(PORT, () => {
-  console.log(`Majesty tactical map server running at http://localhost:${PORT}`);
+  console.log(`Majesty tactical map server is running on http://localhost:${PORT}`);
 });

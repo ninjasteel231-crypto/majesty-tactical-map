@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Majesty Tactical Map Mobile</title>
+    <link rel="stylesheet" href="/mobile.css" />
+  </head>
+  <body>
+    <div class="mobile-shell">
+      <header class="mobile-header">
+        <div>
+          <h1 id="mapTitle">Fortazan Kudo</h1>
+          <small id="sessionBadge">Session: global</small>
+        </div>
+        <button id="refreshBtn">Refresh</button>
+      </header>
+
+      <main class="mobile-layout">
+        <section class="map-panel">
+          <canvas id="mobileCanvas" width="900" height="700"></canvas>
+        </section>
+
+        <aside class="info-panel">
+          <div class="info-card">
+            <h2>Players</h2>
+            <ul id="playersList"></ul>
+          </div>
+
+          <div class="info-card">
+            <h2>Markers</h2>
+            <ul id="markersList"></ul>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script src="/mobile.js"></script>
+  </body>
+</html>
