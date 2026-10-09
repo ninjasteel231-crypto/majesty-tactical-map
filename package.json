@@ -1,0 +1,25 @@
+{
+  "name": "majesty-tactical-map",
+  "version": "1.0.0",
+  "description": "Browser-based tactical 3D map editor and live session sync for Majesty RP.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check": "node --check server.js"
+  },
+  "keywords": [
+    "tactical-map",
+    "rpg",
+    "browser-game",
+    "discord",
+    "3d-map",
+    "majesty-rp"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}

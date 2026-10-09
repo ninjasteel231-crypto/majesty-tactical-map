@@ -1,0 +1,9 @@
+# Ignore local runtime data
+node_modules/
+.env
+.DS_Store
+npm-debug.log*
+
+# Keep runtime state local
+/data/*.json
+!/data/default-map.json

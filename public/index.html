@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Majesty Tactical Map</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar left-panel">
+        <div class="panel-header">
+          <h1>Majesty Map</h1>
+        </div>
+
+        <div class="tool-group">
+          <h2>Tools</h2>
+          <button class="tool active" data-tool="select">Select</button>
+          <button class="tool" data-tool="rectangle">Rectangle</button>
+          <button class="tool" data-tool="circle">Circle</button>
+          <button class="tool" data-tool="polygon">Polygon</button>
+          <button class="tool" data-tool="marker">Marker</button>
+          <button class="tool" data-tool="erase">Erase</button>
+        </div>
+
+        <div class="tool-group">
+          <h2>Map</h2>
+          <button id="addObjectBtn">Add object</button>
+          <button id="saveMapBtn">Save map</button>
+          <button id="newMapBtn">Reset map</button>
+        </div>
+
+        <div class="tool-group">
+          <h2>Session</h2>
+          <label>
+            <span>User</span>
+            <input id="userNameInput" type="text" value="Operator" />
+          </label>
+          <label>
+            <span>Session</span>
+            <input id="sessionIdInput" type="text" value="operator-1" />
+          </label>
+          <button id="connectSessionBtn">Connect</button>
+          <button id="presenceBtn">Update Discord</button>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <div class="topbar">
+          <div>
+            <strong id="mapTitle">Fortazan Kudo</strong>
+            <span id="statusText">Ready</span>
+          </div>
+          <div class="badge" id="syncBadge">offline</div>
+        </div>
+
+        <canvas id="mapCanvas" width="1200" height="800"></canvas>
+      </main>
+
+      <aside class="sidebar right-panel">
+        <div class="panel-header">
+          <h2>Inspector</h2>
+        </div>
+
+        <div class="inspector-block">
+          <label>
+            <span>Object name</span>
+            <input id="objectNameInput" type="text" value="Object" />
+          </label>
+          <label>
+            <span>Layer</span>
+            <select id="layerSelect">
+              <option value="terrain">Terrain</option>
+              <option value="structures">Structures</option>
+              <option value="tactics">Tactical markers</option>
+            </select>
+          </label>
+          <label>
+            <span>Fill</span>
+            <input id="fillInput" type="color" value="#4f46e5" />
+          </label>
+          <label>
+            <span>Stroke</span>
+            <input id="strokeInput" type="color" value="#e2e8f0" />
+          </label>
+        </div>
+
+        <div class="inspector-block">
+          <h3>Transform</h3>
+          <div class="two-col">
+            <label>
+              <span>X</span>
+              <input id="posXInput" type="number" value="0" />
+            </label>
+            <label>
+              <span>Y</span>
+              <input id="posYInput" type="number" value="0" />
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span>W</span>
+              <input id="sizeWInput" type="number" value="100" />
+            </label>
+            <label>
+              <span>H</span>
+              <input id="sizeHInput" type="number" value="100" />
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span>Rotation</span>
+              <input id="rotationInput" type="number" value="0" />
+            </label>
+            <label>
+              <span>Radius</span>
+              <input id="radiusInput" type="number" value="50" />
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span>Corner</span>
+              <input id="cornerInput" type="number" value="0" />
+            </label>
+            <label>
+              <span>Opacity</span>
+              <input id="opacityInput" type="number" step="0.1" value="0.9" />
+            </label>
+          </div>
+        </div>
+
+        <div class="inspector-block">
+          <h3>Discord</h3>
+          <label>
+            <span>Status</span>
+            <input id="discordStatusInput" type="text" value="In tactical planning" />
+          </label>
+          <label>
+            <span>Details</span>
+            <input id="discordDetailsInput" type="text" value="Fortazan Kudo" />
+          </label>
+          <label>
+            <span>State</span>
+            <input id="discordStateInput" type="text" value="Tracking enemy positions" />
+          </label>
+        </div>
+      </aside>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,72 @@
+{
+  "id": "fortazan-kudo",
+  "name": "Fortazan Kudo",
+  "description": "Main tactical map for Majesty RP",
+  "width": 1600,
+  "height": 1000,
+  "gridSize": 40,
+  "layers": [
+    { "id": "terrain", "name": "Terrain", "visible": true },
+    { "id": "structures", "name": "Structures", "visible": true },
+    { "id": "tactics", "name": "Tactical markers", "visible": true }
+  ],
+  "objects": [
+    {
+      "id": "route-1",
+      "name": "Main road",
+      "type": "rectangle",
+      "layer": "terrain",
+      "x": 200,
+      "y": 180,
+      "width": 560,
+      "height": 120,
+      "rotation": 0,
+      "cornerRadius": 30,
+      "fill": "#334155",
+      "stroke": "#94a3b8",
+      "strokeWidth": 2,
+      "opacity": 0.78,
+      "z": 5,
+      "locked": false
+    },
+    {
+      "id": "block-1",
+      "name": "Building A",
+      "type": "rectangle",
+      "layer": "structures",
+      "x": 520,
+      "y": 420,
+      "width": 260,
+      "height": 180,
+      "rotation": 0,
+      "cornerRadius": 18,
+      "fill": "#475569",
+      "stroke": "#e2e8f0",
+      "strokeWidth": 2,
+      "opacity": 0.9,
+      "z": 10,
+      "locked": false
+    },
+    {
+      "id": "enemy-1",
+      "name": "Enemy team",
+      "type": "marker",
+      "layer": "tactics",
+      "x": 780,
+      "y": 500,
+      "width": 76,
+      "height": 76,
+      "rotation": 0,
+      "fill": "#ef4444",
+      "stroke": "#fecaca",
+      "opacity": 0.98,
+      "z": 20,
+      "label": "E-1"
+    }
+  ],
+  "players": [],
+  "markers": [
+    { "id": "marker-1", "label": "Checkpoint", "x": 680, "y": 260, "color": "#fbbf24" }
+  ],
+  "updatedAt": "2025-01-01T00:00:00.000Z"
+}
