@@ -14,6 +14,7 @@ const resetMapBtn = document.getElementById('resetMapBtn');
 const mobileViewBtn = document.getElementById('mobileViewBtn');
 const connectSessionBtn = document.getElementById('connectSessionBtn');
 const presenceBtn = document.getElementById('presenceBtn');
+const layerList = document.getElementById('layerList');
 
 const objectNameInput = document.getElementById('objectNameInput');
 const layerSelect = document.getElementById('layerSelect');
@@ -33,14 +34,20 @@ const discordStateInput = document.getElementById('discordStateInput');
 
 const state = {
   tool: 'select',
+  mode: 'edit', // 'edit' or 'view'
   map: null,
   selectedId: null,
+  selectedHandle: null, // 'move', 'tl', 'tr', 'bl', 'br', 'resize'
   socket: null,
   drag: null,
   isDirty: false,
   sessionId: null,
-  mapId: 'fortazan-kudo'
+  mapId: 'fortazan-kudo',
+  visibleLayers: {}
 };
+
+const HANDLE_SIZE = 8;
+const HANDLE_DIST = 12;
 
 const defaultMap = {
   id: 'fortazan-kudo',
@@ -142,6 +149,37 @@ function getSelectedObject() {
   return state.map?.objects.find((obj) => obj.id === state.selectedId) || null;
 }
 
+function isLayerVisible(layerId) {
+  if (state.visibleLayers[layerId] === undefined) {
+    const layer = state.map?.layers.find(l => l.id === layerId);
+    return layer?.visible ?? true;
+  }
+  return state.visibleLayers[layerId];
+}
+
+function toggleLayerVisibility(layerId) {
+  state.visibleLayers[layerId] = !isLayerVisible(layerId);
+  renderLayerList();
+  render();
+}
+
+function renderLayerList() {
+  layerList.innerHTML = '';
+  (state.map?.layers || []).forEach((layer) => {
+    const visible = isLayerVisible(layer.id);
+    const div = document.createElement('div');
+    div.className = 'layer-item';
+    div.innerHTML = `
+      <button class="layer-toggle" data-layer-id="${layer.id}" style="opacity: ${visible ? 1 : 0.5}">
+        ${visible ? '👁' : '👁‍🗨'}
+      </button>
+      <span class="layer-name">${layer.name}</span>
+    `;
+    div.querySelector('.layer-toggle').addEventListener('click', () => toggleLayerVisibility(layer.id));
+    layerList.appendChild(div);
+  });
+}
+
 function getObjectPoints(obj) {
   if (!obj) return [];
 
@@ -218,6 +256,27 @@ function pointerToWorld(event) {
     x: sx - canvas.width / 2,
     y: sy - canvas.height / 2
   };
+}
+
+function getHandleAtPosition(obj, world) {
+  if (!obj) return null;
+  const box = getBoundingBox(obj);
+  if (!box) return null;
+
+  const handles = {
+    tl: { x: box.x, y: box.y },
+    tr: { x: box.x + box.width, y: box.y },
+    bl: { x: box.x, y: box.y + box.height },
+    br: { x: box.x + box.width, y: box.y + box.height },
+    move: { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  };
+
+  for (const [name, pos] of Object.entries(handles)) {
+    const dist = Math.hypot(world.x - pos.x, world.y - pos.y);
+    if (dist <= HANDLE_DIST) return name;
+  }
+
+  return null;
 }
 
 function drawGrid() {
@@ -358,15 +417,42 @@ function drawMapMarkers() {
   });
 }
 
-function drawSelection(bounds) {
+function drawSelectionHandles(bounds) {
   if (!bounds) return;
   const p = worldToCanvas(bounds.x, bounds.y);
 
-  ctx.strokeStyle = '#f8fafc';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 2;
   ctx.setLineDash([6, 6]);
   ctx.strokeRect(p.x, p.y, bounds.width, bounds.height);
   ctx.setLineDash([]);
+
+  // Draw handles
+  const handles = [
+    { x: p.x, y: p.y, name: 'tl' },
+    { x: p.x + bounds.width, y: p.y, name: 'tr' },
+    { x: p.x, y: p.y + bounds.height, name: 'bl' },
+    { x: p.x + bounds.width, y: p.y + bounds.height, name: 'br' }
+  ];
+
+  handles.forEach(({ x, y }) => {
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(x - HANDLE_SIZE / 2, y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
+    ctx.strokeStyle = '#f8fafc';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x - HANDLE_SIZE / 2, y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
+  });
+
+  // Draw move handle in center
+  const cx = p.x + bounds.width / 2;
+  const cy = p.y + bounds.height / 2;
+  ctx.fillStyle = '#60a5fa';
+  ctx.beginPath();
+  ctx.arc(cx, cy, HANDLE_SIZE / 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#f8fafc';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 }
 
 function render() {
@@ -375,8 +461,10 @@ function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
 
-  const objects = [...state.map.objects].sort((a, b) => (a.z || 0) - (b.z || 0));
-  objects.forEach((obj) => {
+  const visibleObjects = state.map.objects.filter(obj => isLayerVisible(obj.layer));
+  const sortedObjects = [...visibleObjects].sort((a, b) => (a.z || 0) - (b.z || 0));
+
+  sortedObjects.forEach((obj) => {
     if (obj.type === 'rectangle') drawRoundedRect(obj);
     else if (obj.type === 'circle') drawCircle(obj);
     else if (obj.type === 'polygon') drawPolygon(obj);
@@ -388,7 +476,9 @@ function render() {
 
   const selectedObj = getSelectedObject();
   const box = selectedObj ? getBoundingBox(selectedObj) : null;
-  if (box) drawSelection(box);
+  if (box && state.mode === 'edit') {
+    drawSelectionHandles(box);
+  }
 }
 
 function refreshInspector() {
@@ -575,10 +665,24 @@ function deleteSelected() {
 }
 
 canvas.addEventListener('pointerdown', (event) => {
+  if (state.mode !== 'edit') return;
+
   const world = pointerToWorld(event);
+  const selectedObj = getSelectedObject();
+
+  // Check for handle interaction first
+  if (selectedObj && state.tool === 'select') {
+    const handle = getHandleAtPosition(selectedObj, world);
+    if (handle) {
+      state.selectedHandle = handle;
+      state.drag = world;
+      return;
+    }
+  }
 
   if (state.tool === 'erase') {
     const clicked = [...state.map.objects].reverse().find((obj) => {
+      if (!isLayerVisible(obj.layer)) return false;
       const box = getBoundingBox(obj);
       if (!box) return false;
       return world.x >= box.x && world.x <= box.x + box.width && world.y >= box.y && world.y <= box.y + box.height;
@@ -595,6 +699,7 @@ canvas.addEventListener('pointerdown', (event) => {
 
   if (state.tool === 'select') {
     const clicked = [...state.map.objects].reverse().find((obj) => {
+      if (!isLayerVisible(obj.layer)) return false;
       const box = getBoundingBox(obj);
       if (!box) return false;
       return world.x >= box.x && world.x <= box.x + box.width && world.y >= box.y && world.y <= box.y + box.height;
@@ -610,45 +715,52 @@ canvas.addEventListener('pointerdown', (event) => {
 });
 
 canvas.addEventListener('pointermove', (event) => {
-  if (!state.map || !state.selectedId) return;
+  if (!state.map || !state.selectedId || state.mode !== 'edit') return;
 
   if (state.drag) {
     const world = pointerToWorld(event);
     const item = getSelectedObject();
     if (!item) return;
 
-    item.x = Number((item.x + (world.x - state.drag.x)).toFixed(1));
-    item.y = Number((item.y + (world.y - state.drag.y)).toFixed(1));
+    if (state.selectedHandle === 'move') {
+      item.x = Number((item.x + (world.x - state.drag.x)).toFixed(1));
+      item.y = Number((item.y + (world.y - state.drag.y)).toFixed(1));
+    } else if (state.selectedHandle === 'br') {
+      item.width = Math.max(20, Number((item.width + (world.x - state.drag.x)).toFixed(1)));
+      item.height = Math.max(20, Number((item.height + (world.y - state.drag.y)).toFixed(1)));
+    } else if (state.selectedHandle === 'tr') {
+      item.width = Math.max(20, Number((item.width + (world.x - state.drag.x)).toFixed(1)));
+      item.y = Number((item.y + (world.y - state.drag.y)).toFixed(1));
+      item.height = Math.max(20, Number((item.height - (world.y - state.drag.y)).toFixed(1)));
+    } else if (state.selectedHandle === 'bl') {
+      item.x = Number((item.x + (world.x - state.drag.x)).toFixed(1));
+      item.width = Math.max(20, Number((item.width - (world.x - state.drag.x)).toFixed(1)));
+      item.height = Math.max(20, Number((item.height + (world.y - state.drag.y)).toFixed(1)));
+    } else if (state.selectedHandle === 'tl') {
+      item.x = Number((item.x + (world.x - state.drag.x)).toFixed(1));
+      item.y = Number((item.y + (world.y - state.drag.y)).toFixed(1));
+      item.width = Math.max(20, Number((item.width - (world.x - state.drag.x)).toFixed(1)));
+      item.height = Math.max(20, Number((item.height - (world.y - state.drag.y)).toFixed(1)));
+    }
 
     state.drag = world;
     posXInput.value = Math.round(item.x);
     posYInput.value = Math.round(item.y);
+    sizeWInput.value = Math.round(item.width || item.radius || 100);
+    sizeHInput.value = Math.round(item.height || item.radius || 100);
     state.isDirty = true;
     render();
   }
 });
 
-canvas.addEventListener('pointerdown', (event) => {
-  const world = pointerToWorld(event);
-  const clicked = [...state.map.objects].reverse().find((obj) => {
-    const box = getBoundingBox(obj);
-    if (!box) return false;
-    return world.x >= box.x && world.x <= box.x + box.width && world.y >= box.y && world.y <= box.y + box.height;
-  });
-
-  if (clicked && state.tool === 'select') {
-    state.selectedId = clicked.id;
-    state.drag = world;
-    refreshInspector();
-  }
-});
-
 canvas.addEventListener('pointerup', () => {
   state.drag = null;
+  state.selectedHandle = null;
 });
 
 canvas.addEventListener('pointerleave', () => {
   state.drag = null;
+  state.selectedHandle = null;
 });
 
 async function fetchMap() {
@@ -658,6 +770,8 @@ async function fetchMap() {
     state.map = data;
     state.mapId = data.id;
     mapTitle.textContent = data.name || 'Fortazan Kudo';
+    state.visibleLayers = {};
+    renderLayerList();
     setStatus('Map loaded', 'success');
     render();
     refreshInspector();
@@ -665,6 +779,8 @@ async function fetchMap() {
     console.error(error);
     state.map = cloneMap(defaultMap);
     mapTitle.textContent = state.map.name;
+    state.visibleLayers = {};
+    renderLayerList();
     setStatus('Loaded default map', 'error');
     render();
     refreshInspector();
@@ -758,6 +874,8 @@ function connectWebSocket() {
       const message = JSON.parse(event.data);
       if (message.type === 'map:update') {
         state.map = message.payload;
+        state.visibleLayers = {};
+        renderLayerList();
         setStatus('Map synchronized', 'success');
         render();
       }
@@ -791,6 +909,8 @@ function attachActions() {
   resetMapBtn.addEventListener('click', () => {
     state.map = cloneMap(defaultMap);
     state.selectedId = null;
+    state.visibleLayers = {};
+    renderLayerList();
     setStatus('Default map restored');
     render();
   });
