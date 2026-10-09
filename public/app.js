@@ -34,16 +34,19 @@ const discordStateInput = document.getElementById('discordStateInput');
 
 const state = {
   tool: 'select',
-  mode: 'edit', // 'edit' or 'view'
+  mode: 'edit',
   map: null,
   selectedId: null,
-  selectedHandle: null, // 'move', 'tl', 'tr', 'bl', 'br', 'resize'
-  socket: null,
+  selectedHandle: null,
   drag: null,
   isDirty: false,
   sessionId: null,
   mapId: 'fortazan-kudo',
-  visibleLayers: {}
+  visibleLayers: {},
+  gridSize: 40,
+  snapEnabled: true,
+  dragOrigin: null,
+  rotationHandle: null
 };
 
 const HANDLE_SIZE = 8;
@@ -150,11 +153,9 @@ function getSelectedObject() {
 }
 
 function isLayerVisible(layerId) {
-  if (state.visibleLayers[layerId] === undefined) {
-    const layer = state.map?.layers.find(l => l.id === layerId);
-    return layer?.visible ?? true;
-  }
-  return state.visibleLayers[layerId];
+  const layer = state.map?.layers.find(l => l.id === layerId);
+  if (state.visibleLayers[layerId] !== undefined) return state.visibleLayers[layerId];
+  return layer?.visible ?? true;
 }
 
 function toggleLayerVisibility(layerId) {
@@ -180,17 +181,60 @@ function renderLayerList() {
   });
 }
 
+function snap(value) {
+  if (!state.snapEnabled) return value;
+  return Math.round(value / state.gridSize) * state.gridSize;
+}
+
+function worldToCanvas(x, y) {
+  return {
+    x: x + canvas.width / 2,
+    y: y + canvas.height / 2
+  };
+}
+
+function pointerToWorld(event) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = ((event.clientX - rect.left) / rect.width) * canvas.width;
+  const sy = ((event.clientY - rect.top) / rect.height) * canvas.height;
+  return {
+    x: sx - canvas.width / 2,
+    y: sy - canvas.height / 2
+  };
+}
+
+function rotatePoint(point, centerX, centerY, angle) {
+  const radians = (angle * Math.PI) / 180;
+  const dx = point.x - centerX;
+  const dy = point.y - centerY;
+  return {
+    x: centerX + dx * Math.cos(radians) - dy * Math.sin(radians),
+    y: centerY + dx * Math.sin(radians) + dy * Math.cos(radians)
+  };
+}
+
+function transformPoint(point, obj) {
+  if (!obj || !obj.rotation) return point;
+  const cx = obj.x + (obj.width || 0) / 2;
+  const cy = obj.y + (obj.height || 0) / 2;
+  return rotatePoint(point, cx, cy, obj.rotation);
+}
+
 function getObjectPoints(obj) {
   if (!obj) return [];
 
   switch (obj.type) {
-    case 'rectangle':
-      return [
+    case 'rectangle': {
+      const corners = [
         { x: obj.x, y: obj.y },
         { x: obj.x + obj.width, y: obj.y },
         { x: obj.x + obj.width, y: obj.y + obj.height },
         { x: obj.x, y: obj.y + obj.height }
       ];
+      const centerX = obj.x + obj.width / 2;
+      const centerY = obj.y + obj.height / 2;
+      return corners.map((p) => rotatePoint(p, centerX, centerY, obj.rotation || 0));
+    }
     case 'circle': {
       const points = [];
       const radius = obj.radius || 50;
@@ -205,13 +249,17 @@ function getObjectPoints(obj) {
     }
     case 'polygon':
       return (obj.points || []).map((p) => ({ x: obj.x + p.x, y: obj.y + p.y }));
-    case 'marker':
-      return [
+    case 'marker': {
+      const corners = [
         { x: obj.x, y: obj.y },
         { x: obj.x + obj.width, y: obj.y },
         { x: obj.x + obj.width, y: obj.y + obj.height },
         { x: obj.x, y: obj.y + obj.height }
       ];
+      const centerX = obj.x + obj.width / 2;
+      const centerY = obj.y + obj.height / 2;
+      return corners.map((p) => rotatePoint(p, centerX, centerY, obj.rotation || 0));
+    }
     default:
       return [];
   }
@@ -241,38 +289,22 @@ function getBoundingBox(obj) {
   };
 }
 
-function worldToCanvas(x, y) {
-  return {
-    x: x + canvas.width / 2,
-    y: y + canvas.height / 2
-  };
-}
-
-function pointerToWorld(event) {
-  const rect = canvas.getBoundingClientRect();
-  const sx = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  const sy = ((event.clientY - rect.top) / rect.height) * canvas.height;
-  return {
-    x: sx - canvas.width / 2,
-    y: sy - canvas.height / 2
-  };
-}
-
 function getHandleAtPosition(obj, world) {
   if (!obj) return null;
   const box = getBoundingBox(obj);
   if (!box) return null;
-
+  const p = worldToCanvas(box.x, box.y);
   const handles = {
-    tl: { x: box.x, y: box.y },
-    tr: { x: box.x + box.width, y: box.y },
-    bl: { x: box.x, y: box.y + box.height },
-    br: { x: box.x + box.width, y: box.y + box.height },
-    move: { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+    tl: { x: p.x, y: p.y },
+    tr: { x: p.x + box.width, y: p.y },
+    bl: { x: p.x, y: p.y + box.height },
+    br: { x: p.x + box.width, y: p.y + box.height },
+    move: { x: p.x + box.width / 2, y: p.y + box.height / 2 },
+    rotate: { x: p.x + box.width / 2, y: p.y - 26 }
   };
 
   for (const [name, pos] of Object.entries(handles)) {
-    const dist = Math.hypot(world.x - pos.x, world.y - pos.y);
+    const dist = Math.hypot(world.x - (pos.x - canvas.width / 2), world.y - (pos.y - canvas.height / 2));
     if (dist <= HANDLE_DIST) return name;
   }
 
@@ -280,7 +312,7 @@ function getHandleAtPosition(obj, world) {
 }
 
 function drawGrid() {
-  const step = state.map?.gridSize || 40;
+  const step = state.gridSize;
   ctx.strokeStyle = 'rgba(148,163,184,0.12)';
   ctx.lineWidth = 1;
 
@@ -394,7 +426,6 @@ function drawPlayers() {
     ctx.fillStyle = player.color || '#34d399';
     ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
     ctx.fill();
-
     ctx.fillStyle = '#e2e8f0';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
@@ -409,7 +440,6 @@ function drawMapMarkers() {
     ctx.fillStyle = marker.color || '#fbbf24';
     ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
     ctx.fill();
-
     ctx.fillStyle = '#f8fafc';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
@@ -420,20 +450,18 @@ function drawMapMarkers() {
 function drawSelectionHandles(bounds) {
   if (!bounds) return;
   const p = worldToCanvas(bounds.x, bounds.y);
-
-  ctx.strokeStyle = '#fbbf24';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 6]);
-  ctx.strokeRect(p.x, p.y, bounds.width, bounds.height);
-  ctx.setLineDash([]);
-
-  // Draw handles
   const handles = [
     { x: p.x, y: p.y, name: 'tl' },
     { x: p.x + bounds.width, y: p.y, name: 'tr' },
     { x: p.x, y: p.y + bounds.height, name: 'bl' },
     { x: p.x + bounds.width, y: p.y + bounds.height, name: 'br' }
   ];
+
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 6]);
+  ctx.strokeRect(p.x, p.y, bounds.width, bounds.height);
+  ctx.setLineDash([]);
 
   handles.forEach(({ x, y }) => {
     ctx.fillStyle = '#fbbf24';
@@ -443,16 +471,26 @@ function drawSelectionHandles(bounds) {
     ctx.strokeRect(x - HANDLE_SIZE / 2, y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
   });
 
-  // Draw move handle in center
-  const cx = p.x + bounds.width / 2;
-  const cy = p.y + bounds.height / 2;
+  const centerX = p.x + bounds.width / 2;
+  const centerY = p.y + bounds.height / 2;
+  const rotatePos = { x: centerX, y: p.y - 26 };
   ctx.fillStyle = '#60a5fa';
   ctx.beginPath();
-  ctx.arc(cx, cy, HANDLE_SIZE / 2, 0, Math.PI * 2);
+  ctx.arc(centerX, p.y - 26, HANDLE_SIZE / 2, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#f8fafc';
   ctx.lineWidth = 1.5;
   ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY);
+  ctx.lineTo(rotatePos.x, rotatePos.y);
+  ctx.stroke();
+
+  ctx.fillStyle = '#60a5fa';
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, HANDLE_SIZE / 2, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function render() {
@@ -639,12 +677,15 @@ function makePolygon(x, y) {
 }
 
 function addObjectAtPosition(x, y) {
+  const snappedX = snap(x);
+  const snappedY = snap(y);
+
   let obj = null;
 
-  if (state.tool === 'rectangle') obj = makeRectangle(x, y);
-  if (state.tool === 'circle') obj = makeCircle(x, y);
-  if (state.tool === 'marker') obj = makeMarker(x, y);
-  if (state.tool === 'polygon') obj = makePolygon(x, y);
+  if (state.tool === 'rectangle') obj = makeRectangle(snappedX, snappedY);
+  if (state.tool === 'circle') obj = makeCircle(snappedX, snappedY);
+  if (state.tool === 'marker') obj = makeMarker(snappedX, snappedY);
+  if (state.tool === 'polygon') obj = makePolygon(snappedX, snappedY);
 
   if (!obj) return;
 
@@ -670,12 +711,19 @@ canvas.addEventListener('pointerdown', (event) => {
   const world = pointerToWorld(event);
   const selectedObj = getSelectedObject();
 
-  // Check for handle interaction first
-  if (selectedObj && state.tool === 'select') {
+  if (state.tool === 'select' && selectedObj) {
     const handle = getHandleAtPosition(selectedObj, world);
     if (handle) {
       state.selectedHandle = handle;
-      state.drag = world;
+      state.drag = { x: world.x, y: world.y };
+      state.dragOrigin = {
+        item: selectedObj,
+        x: selectedObj.x,
+        y: selectedObj.y,
+        width: selectedObj.width || 0,
+        height: selectedObj.height || 0,
+        rotation: selectedObj.rotation || 0
+      };
       return;
     }
   }
@@ -691,8 +739,8 @@ canvas.addEventListener('pointerdown', (event) => {
     if (clicked) {
       state.map.objects = state.map.objects.filter((obj) => obj.id !== clicked.id);
       state.selectedId = null;
-      render();
       state.isDirty = true;
+      render();
     }
     return;
   }
@@ -715,39 +763,55 @@ canvas.addEventListener('pointerdown', (event) => {
 });
 
 canvas.addEventListener('pointermove', (event) => {
-  if (!state.map || !state.selectedId || state.mode !== 'edit') return;
+  if (!state.map || state.mode !== 'edit') return;
 
-  if (state.drag) {
+  if (state.drag && state.selectedHandle && state.dragOrigin?.item) {
     const world = pointerToWorld(event);
-    const item = getSelectedObject();
-    if (!item) return;
+    const item = state.dragOrigin.item;
+    const dx = world.x - state.drag.x;
+    const dy = world.y - state.drag.y;
 
     if (state.selectedHandle === 'move') {
-      item.x = Number((item.x + (world.x - state.drag.x)).toFixed(1));
-      item.y = Number((item.y + (world.y - state.drag.y)).toFixed(1));
-    } else if (state.selectedHandle === 'br') {
-      item.width = Math.max(20, Number((item.width + (world.x - state.drag.x)).toFixed(1)));
-      item.height = Math.max(20, Number((item.height + (world.y - state.drag.y)).toFixed(1)));
-    } else if (state.selectedHandle === 'tr') {
-      item.width = Math.max(20, Number((item.width + (world.x - state.drag.x)).toFixed(1)));
-      item.y = Number((item.y + (world.y - state.drag.y)).toFixed(1));
-      item.height = Math.max(20, Number((item.height - (world.y - state.drag.y)).toFixed(1)));
-    } else if (state.selectedHandle === 'bl') {
-      item.x = Number((item.x + (world.x - state.drag.x)).toFixed(1));
-      item.width = Math.max(20, Number((item.width - (world.x - state.drag.x)).toFixed(1)));
-      item.height = Math.max(20, Number((item.height + (world.y - state.drag.y)).toFixed(1)));
-    } else if (state.selectedHandle === 'tl') {
-      item.x = Number((item.x + (world.x - state.drag.x)).toFixed(1));
-      item.y = Number((item.y + (world.y - state.drag.y)).toFixed(1));
-      item.width = Math.max(20, Number((item.width - (world.x - state.drag.x)).toFixed(1)));
-      item.height = Math.max(20, Number((item.height - (world.y - state.drag.y)).toFixed(1)));
+      item.x = snap(state.dragOrigin.x + dx);
+      item.y = snap(state.dragOrigin.y + dy);
     }
 
-    state.drag = world;
+    if (state.selectedHandle === 'tl') {
+      item.x = snap(state.dragOrigin.x + dx);
+      item.y = snap(state.dragOrigin.y + dy);
+      item.width = Math.max(20, state.dragOrigin.width - dx);
+      item.height = Math.max(20, state.dragOrigin.height - dy);
+    }
+
+    if (state.selectedHandle === 'tr') {
+      item.y = snap(state.dragOrigin.y + dy);
+      item.width = Math.max(20, state.dragOrigin.width + dx);
+      item.height = Math.max(20, state.dragOrigin.height - dy);
+    }
+
+    if (state.selectedHandle === 'bl') {
+      item.x = snap(state.dragOrigin.x + dx);
+      item.width = Math.max(20, state.dragOrigin.width - dx);
+      item.height = Math.max(20, state.dragOrigin.height + dy);
+    }
+
+    if (state.selectedHandle === 'br') {
+      item.width = Math.max(20, state.dragOrigin.width + dx);
+      item.height = Math.max(20, state.dragOrigin.height + dy);
+    }
+
+    if (state.selectedHandle === 'rotate') {
+      const centerX = item.x + (item.width || 0) / 2;
+      const centerY = item.y + (item.height || 0) / 2;
+      const angle = Math.atan2(world.y - centerY, world.x - centerX) * (180 / Math.PI);
+      item.rotation = Math.round(angle);
+    }
+
     posXInput.value = Math.round(item.x);
     posYInput.value = Math.round(item.y);
     sizeWInput.value = Math.round(item.width || item.radius || 100);
     sizeHInput.value = Math.round(item.height || item.radius || 100);
+    rotationInput.value = Math.round(item.rotation || 0);
     state.isDirty = true;
     render();
   }
@@ -756,11 +820,13 @@ canvas.addEventListener('pointermove', (event) => {
 canvas.addEventListener('pointerup', () => {
   state.drag = null;
   state.selectedHandle = null;
+  state.dragOrigin = null;
 });
 
 canvas.addEventListener('pointerleave', () => {
   state.drag = null;
   state.selectedHandle = null;
+  state.dragOrigin = null;
 });
 
 async function fetchMap() {
@@ -781,7 +847,7 @@ async function fetchMap() {
     mapTitle.textContent = state.map.name;
     state.visibleLayers = {};
     renderLayerList();
-    setStatus('Loaded default map', 'error');
+    setStatus('Loaded default map');
     render();
     refreshInspector();
   }
@@ -808,7 +874,7 @@ async function saveMap() {
     }
   } catch (error) {
     console.error('Save failed:', error);
-    setStatus('Could not save map', 'error');
+    setStatus('Map save failed', 'error');
   }
 }
 
@@ -853,7 +919,7 @@ async function updateDiscordPresence() {
     });
 
     const payload = await response.json();
-    setStatus(`Discord: ${payload.status}`, 'success');
+    setStatus(`Discord sync: ${payload.status || 'ok'}`, 'success');
   } catch (error) {
     console.error('Discord update failed:', error);
     setStatus('Discord update failed', 'error');
